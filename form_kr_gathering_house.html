@@ -41,7 +41,7 @@
   .field.error input, .field.error select { border-color: var(--red); background: var(--red-light); }
   .field-error { font-size: 11px; color: var(--red); margin-top: 4px; display: none; }
   .field.error .field-error { display: block; }
-  .loc-buttons { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .loc-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
   .loc-btn { padding: 10px 8px; font-family: var(--font); font-size: 13px; font-weight: 400; color: var(--text); background: var(--bg); border: 1px solid #c8c4bc; border-radius: 8px; cursor: pointer; text-align: center; transition: all 0.15s; line-height: 1.3; }
   .loc-btn:hover { background: var(--accent-light); border-color: var(--accent); }
   .loc-btn.active { background: var(--btn-active-bg); color: var(--btn-active-text); border-color: var(--btn-active-bg); }
@@ -54,6 +54,12 @@
   .arrow-divider { text-align: center; font-size: 20px; color: var(--muted); margin: 4px 0; }
   .pax-note { font-size: 12px; color: var(--muted); line-height: 1.7; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
   .pax-note strong { color: var(--text); font-weight: 500; }
+  .price-card { text-align: center; }
+  .price-amount { font-size: 32px; font-weight: 500; letter-spacing: -0.01em; color: var(--text); line-height: 1.2; }
+  .price-amount.empty { font-size: 14px; font-weight: 400; color: var(--muted); }
+  .price-unit { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .price-table { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); line-height: 1.9; text-align: left; }
+  .price-table strong { color: var(--text); font-weight: 500; }
   .error-banner { display: none; background: var(--red-light); border: 1px solid var(--red-border); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; font-size: 13px; color: var(--red); line-height: 1.8; }
   .error-banner.show { display: block; }
   .btn-primary { width: 100%; padding: 14px; font-family: var(--font); font-size: 15px; font-weight: 500; color: #fff; background: var(--accent); border: none; border-radius: var(--radius); cursor: pointer; transition: opacity 0.15s, transform 0.1s; margin-bottom: 10px; }
@@ -67,7 +73,7 @@
   .time-notice-row { display: flex; gap: 10px; align-items: baseline; font-size: 13px; color: var(--text); line-height: 1.5; }
   .time-notice-icon { font-size: 11px; font-weight: 500; white-space: nowrap; background: var(--accent-light); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; color: var(--muted); min-width: 90px; text-align: center; }
   .time-notice strong { font-weight: 500; color: var(--text); }
-  @media (max-width: 480px) { .grid-2, .grid-3, .loc-buttons { grid-template-columns: 1fr; } body { padding: 24px 16px 60px; } }
+  @media (max-width: 480px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } body { padding: 24px 16px 60px; } }
 </style>
 </head>
 <body>
@@ -137,6 +143,7 @@
       <button class="loc-btn" data-loc-type="pickup" onclick="selectLoc('pickup','narita')">Narita<br>Airport</button>
       <button class="loc-btn" data-loc-type="pickup" onclick="selectLoc('pickup','haneda')">Haneda<br>Airport</button>
       <button class="loc-btn" data-loc-type="pickup" onclick="selectLoc('pickup','hotel')">Our<br>Hotel</button>
+      <button class="loc-btn" data-loc-type="pickup" onclick="selectLoc('pickup','disney')">Tokyo Disney<br>Resort</button>
     </div>
     <div class="loc-display" id="pickup_display">— select above —</div>
     <div class="loc-error" id="pickup_loc_error">Please select a pickup location.</div>
@@ -157,6 +164,7 @@
       <button class="loc-btn" data-loc-type="dropoff" onclick="selectLoc('dropoff','narita')">Narita<br>Airport</button>
       <button class="loc-btn" data-loc-type="dropoff" onclick="selectLoc('dropoff','haneda')">Haneda<br>Airport</button>
       <button class="loc-btn" data-loc-type="dropoff" onclick="selectLoc('dropoff','hotel')">Our<br>Hotel</button>
+      <button class="loc-btn" data-loc-type="dropoff" onclick="selectLoc('dropoff','disney')">Tokyo Disney<br>Resort</button>
     </div>
     <div class="loc-display" id="dropoff_display">— please select pickup first —</div>
     <div class="loc-error" id="dropoff_loc_error">Please select a drop-off location.</div>
@@ -166,6 +174,17 @@
         <input type="text" id="dropoff_flight" placeholder="e.g. NH123">
         <div class="field-error">Please enter your flight number.</div>
       </div>
+    </div>
+  </div>
+
+  <div class="card price-card">
+    <div class="card-title" style="text-align:left">Fare</div>
+    <div class="price-amount empty" id="price_amount">Select pickup &amp; drop-off to see the fare</div>
+    <div class="price-unit">One way · per vehicle (per group)</div>
+    <div class="price-table">
+      Routes involving <strong>Narita Airport</strong>: <strong>¥30,000</strong><br>
+      <strong>Haneda Airport</strong> routes, or <strong>Our Hotel ⇄ Tokyo Disney Resort</strong>: <strong>¥20,000</strong><br>
+      Fares are one way, per vehicle (not per person).
     </div>
   </div>
 
@@ -228,38 +247,48 @@ const HOTEL = { name: 'KR Gathering House Naka-Itabashi', address: 'Yayoicho 31-
 const LOCATIONS = {
   narita: { label: 'Narita Airport', address: 'Narita International Airport, Narita, Chiba', isAirport: true, maps: '' },
   haneda: { label: 'Haneda Airport', address: 'Tokyo International Airport (Haneda), Ota-ku, Tokyo', isAirport: true, maps: '' },
-  hotel: { label: HOTEL.name, address: HOTEL.address, isAirport: false, maps: HOTEL.maps }
+  hotel: { label: HOTEL.name, address: HOTEL.address, isAirport: false, maps: HOTEL.maps },
+  disney: { label: 'Tokyo Disney Resort', address: '〒279-0031 千葉県浦安市舞浜1-1', isAirport: false, maps: '' }
 };
+
+// Allowed routes: different place, and not airport → airport
+function isAllowedRoute(pu, dr) {
+  if (pu === dr) return false;
+  if (LOCATIONS[pu].isAirport && LOCATIONS[dr].isAirport) return false;
+  return true;
+}
+
+function getFare(pu, dr) {
+  if (!pu || !dr) return null;
+  if (pu === 'narita' || dr === 'narita') return 30000;
+  return 20000;
+}
+
+function updatePrice() {
+  const el = document.getElementById('price_amount');
+  const fare = getFare(selected.pickup, selected.dropoff);
+  if (fare) { el.textContent = '¥' + fare.toLocaleString('en-US'); el.classList.remove('empty'); }
+  else { el.textContent = 'Select pickup & drop-off to see the fare'; el.classList.add('empty'); }
+}
 let selected = { pickup: null, dropoff: null };
 
 function updateDropoffButtons() {
   const pickupKey = selected.pickup;
   const btns = document.querySelectorAll('[data-loc-type="dropoff"]');
-  if (!pickupKey) { btns.forEach(b => { b.style.display='block'; b.disabled=true; b.style.opacity='0.4'; }); return; }
-  const pickupIsAirport = LOCATIONS[pickupKey].isAirport;
+  if (!pickupKey) { btns.forEach(b => { b.style.display='block'; b.disabled=true; b.style.opacity='0.4'; }); updatePrice(); return; }
   btns.forEach(b => {
     const key = b.getAttribute('onclick').match(/'(\w+)'\)$/)[1];
-    const isAirport = LOCATIONS[key].isAirport;
-    b.style.display = pickupIsAirport ? (isAirport ? 'none' : 'block') : (!isAirport ? 'none' : 'block');
+    b.style.display = isAllowedRoute(pickupKey, key) ? 'block' : 'none';
     b.disabled = false; b.style.opacity = '1';
   });
-  if (selected.dropoff) {
-    const doIsAirport = LOCATIONS[selected.dropoff].isAirport;
-    if (pickupIsAirport ? doIsAirport : !doIsAirport) {
-      selected.dropoff = null;
-      btns.forEach(b => b.classList.remove('active'));
-      document.getElementById('dropoff_display').textContent = '— select above —';
-      document.getElementById('dropoff_flight_row').classList.remove('visible');
-    }
-  }
-  if (pickupIsAirport && !selected.dropoff) {
-    selected.dropoff = 'hotel';
-    const loc = LOCATIONS['hotel'];
-    document.getElementById('dropoff_display').textContent = loc.label + '  —  ' + loc.address;
+  if (selected.dropoff && !isAllowedRoute(pickupKey, selected.dropoff)) {
+    selected.dropoff = null;
     btns.forEach(b => b.classList.remove('active'));
-    document.querySelector('[data-loc-type="dropoff"][style*="block"]')?.classList.add('active');
+    document.getElementById('dropoff_display').textContent = '— select above —';
     document.getElementById('dropoff_flight_row').classList.remove('visible');
   }
+  if (!selected.dropoff) document.getElementById('dropoff_display').textContent = '— select above —';
+  updatePrice();
 }
 
 function selectLoc(type, key) {
@@ -272,6 +301,7 @@ function selectLoc(type, key) {
   event.target.closest('.loc-btn').classList.add('active');
   document.getElementById(type+'_flight_row').classList.toggle('visible', loc.isAirport);
   if (type === 'pickup') updateDropoffButtons();
+  updatePrice();
 }
 
 function calcTotal() {
@@ -384,6 +414,8 @@ ${n}Number of suitcases:
 ${document.getElementById('suitcases').value}
 ${n}Number of small luggage:
 ${document.getElementById('small_bag').value}
+${n}Fare (one way, per vehicle):
+${getFare(selected.pickup, selected.dropoff) ? '¥' + getFare(selected.pickup, selected.dropoff).toLocaleString('en-US') : ''}
 ${n}How to pay (cash or credit card ):
 ${document.getElementById('payment').value}
 ${n}Inquiry:
