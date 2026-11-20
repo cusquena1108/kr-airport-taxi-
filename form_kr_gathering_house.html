@@ -49,6 +49,9 @@
   .loc-display.error { border-color: var(--red); background: var(--red-light); color: var(--red); }
   .loc-error { font-size: 11px; color: var(--red); margin-top: 4px; display: none; }
   .loc-error.show { display: block; }
+  .loc-btn-wide { grid-column: 1 / -1; }
+  .other-row { display: none; margin-top: 10px; }
+  .other-row.visible { display: block; }
   .flight-row { display: none; margin-top: 10px; }
   .flight-row.visible { display: block; }
   .arrow-divider { text-align: center; font-size: 20px; color: var(--muted); margin: 4px 0; }
@@ -144,9 +147,23 @@
       <button class="loc-btn" data-loc-type="pickup" onclick="selectLoc('pickup','haneda')">Haneda<br>Airport</button>
       <button class="loc-btn" data-loc-type="pickup" onclick="selectLoc('pickup','hotel')">Our<br>Hotel</button>
       <button class="loc-btn" data-loc-type="pickup" onclick="selectLoc('pickup','disney')">Tokyo Disney<br>Resort</button>
+      <button class="loc-btn loc-btn-wide" data-loc-type="pickup" onclick="selectLoc('pickup','other')">Other (within Tokyo)</button>
     </div>
     <div class="loc-display" id="pickup_display">— select above —</div>
     <div class="loc-error" id="pickup_loc_error">Please select a pickup location.</div>
+    <div class="other-row" id="pickup_other_row">
+      <div class="grid" style="margin-top:10px;">
+        <div class="field" id="field-pickup_other_addr">
+          <label>Address (within Tokyo) <span class="req">*</span></label>
+          <input type="text" id="pickup_other_addr" placeholder="e.g. 1-1-1 Shinjuku, Shinjuku-ku, Tokyo">
+          <div class="field-error">Please enter the address.</div>
+        </div>
+        <div class="field">
+          <label>Name of Building / Place</label>
+          <input type="text" id="pickup_other_bldg" placeholder="e.g. Tokyo Station Hotel">
+        </div>
+      </div>
+    </div>
     <div class="flight-row" id="pickup_flight_row">
       <div class="field" id="field-pickup_flight" style="margin-top:10px;">
         <label>Flight Number <span class="req">*</span></label>
@@ -165,9 +182,23 @@
       <button class="loc-btn" data-loc-type="dropoff" onclick="selectLoc('dropoff','haneda')">Haneda<br>Airport</button>
       <button class="loc-btn" data-loc-type="dropoff" onclick="selectLoc('dropoff','hotel')">Our<br>Hotel</button>
       <button class="loc-btn" data-loc-type="dropoff" onclick="selectLoc('dropoff','disney')">Tokyo Disney<br>Resort</button>
+      <button class="loc-btn loc-btn-wide" data-loc-type="dropoff" onclick="selectLoc('dropoff','other')">Other (within Tokyo)</button>
     </div>
     <div class="loc-display" id="dropoff_display">— please select pickup first —</div>
     <div class="loc-error" id="dropoff_loc_error">Please select a drop-off location.</div>
+    <div class="other-row" id="dropoff_other_row">
+      <div class="grid" style="margin-top:10px;">
+        <div class="field" id="field-dropoff_other_addr">
+          <label>Address (within Tokyo) <span class="req">*</span></label>
+          <input type="text" id="dropoff_other_addr" placeholder="e.g. 1-1-1 Shinjuku, Shinjuku-ku, Tokyo">
+          <div class="field-error">Please enter the address.</div>
+        </div>
+        <div class="field">
+          <label>Name of Building / Place</label>
+          <input type="text" id="dropoff_other_bldg" placeholder="e.g. Tokyo Station Hotel">
+        </div>
+      </div>
+    </div>
     <div class="flight-row" id="dropoff_flight_row">
       <div class="field" id="field-dropoff_flight" style="margin-top:10px;">
         <label>Flight Number <span class="req">*</span></label>
@@ -182,8 +213,11 @@
     <div class="price-amount empty" id="price_amount">Select pickup &amp; drop-off to see the fare</div>
     <div class="price-unit">One way · per vehicle (per group)</div>
     <div class="price-table">
-      Routes involving <strong>Narita Airport</strong>: <strong>¥30,000</strong><br>
-      <strong>Haneda Airport</strong> routes, or <strong>Our Hotel ⇄ Tokyo Disney Resort</strong>: <strong>¥20,000</strong><br>
+      <strong>Narita Airport</strong> ⇄ Our Hotel / Tokyo Disney Resort: <strong>¥30,000</strong><br>
+      <strong>Haneda Airport</strong> ⇄ Our Hotel / Tokyo Disney Resort: <strong>¥20,000</strong><br>
+      <strong>Our Hotel ⇄ Tokyo Disney Resort</strong>: <strong>¥20,000</strong><br>
+      <strong>Our Hotel ⇄ Other (within Tokyo)</strong>: <strong>¥20,000</strong><br>
+      Other routes: the fare will be provided after we receive your request.<br>
       Fares are one way, per vehicle (not per person).
     </div>
   </div>
@@ -248,7 +282,8 @@ const LOCATIONS = {
   narita: { label: 'Narita Airport', address: 'Narita International Airport, Narita, Chiba', isAirport: true, maps: '' },
   haneda: { label: 'Haneda Airport', address: 'Tokyo International Airport (Haneda), Ota-ku, Tokyo', isAirport: true, maps: '' },
   hotel: { label: HOTEL.name, address: HOTEL.address, isAirport: false, maps: HOTEL.maps },
-  disney: { label: 'Tokyo Disney Resort', address: '1-1 Maihama, Urayasu-shi, Chiba 279-0031', isAirport: false, maps: '' }
+  disney: { label: 'Tokyo Disney Resort', address: '1-1 Maihama, Urayasu-shi, Chiba 279-0031', isAirport: false, maps: '' },
+  other: { label: 'Other (within Tokyo)', address: 'enter the address below', isAirport: false, isOther: true, maps: '' }
 };
 
 // Allowed routes: different place, and not airport → airport
@@ -258,16 +293,25 @@ function isAllowedRoute(pu, dr) {
   return true;
 }
 
+// returns a number, 'TBD' (to be confirmed), or null (not selected yet)
 function getFare(pu, dr) {
   if (!pu || !dr) return null;
+  if (pu === 'other' || dr === 'other') {
+    return (pu === 'hotel' || dr === 'hotel') ? 20000 : 'TBD';
+  }
   if (pu === 'narita' || dr === 'narita') return 30000;
   return 20000;
+}
+
+function fareText(fare) {
+  if (fare === 'TBD') return 'To be confirmed';
+  return '¥' + fare.toLocaleString('en-US');
 }
 
 function updatePrice() {
   const el = document.getElementById('price_amount');
   const fare = getFare(selected.pickup, selected.dropoff);
-  if (fare) { el.textContent = '¥' + fare.toLocaleString('en-US'); el.classList.remove('empty'); }
+  if (fare) { el.textContent = fareText(fare); el.classList.remove('empty'); }
   else { el.textContent = 'Select pickup & drop-off to see the fare'; el.classList.add('empty'); }
 }
 let selected = { pickup: null, dropoff: null };
@@ -286,6 +330,7 @@ function updateDropoffButtons() {
     btns.forEach(b => b.classList.remove('active'));
     document.getElementById('dropoff_display').textContent = '— select above —';
     document.getElementById('dropoff_flight_row').classList.remove('visible');
+    document.getElementById('dropoff_other_row').classList.remove('visible');
   }
   if (!selected.dropoff) document.getElementById('dropoff_display').textContent = '— select above —';
   updatePrice();
@@ -300,6 +345,7 @@ function selectLoc(type, key) {
   document.querySelectorAll('[data-loc-type="'+type+'"]').forEach(b => b.classList.remove('active'));
   event.target.closest('.loc-btn').classList.add('active');
   document.getElementById(type+'_flight_row').classList.toggle('visible', loc.isAirport);
+  document.getElementById(type+'_other_row').classList.toggle('visible', !!loc.isOther);
   if (type === 'pickup') updateDropoffButtons();
   updatePrice();
 }
@@ -317,6 +363,10 @@ function getDayOfWeek(d) { if(!d) return ''; return ['Sunday','Monday','Tuesday'
 function getLocInfo(type) {
   const key = selected[type]; if(!key) return { addr:'', bldg:'', maps:'', flight:'' };
   const loc = LOCATIONS[key];
+  if (loc.isOther) {
+    const bldg = document.getElementById(type+'_other_bldg').value.trim();
+    return { addr: document.getElementById(type+'_other_addr').value.trim(), bldg: bldg || 'Other (within Tokyo)', maps: '', flight: '' };
+  }
   return { addr: loc.address, bldg: loc.label, maps: loc.maps||'', flight: loc.isAirport ? document.getElementById(type+'_flight').value : '' };
 }
 
@@ -340,6 +390,9 @@ function validate() {
   } else if (LOCATIONS[selected.pickup].isAirport && !document.getElementById('pickup_flight').value.trim()) {
     document.getElementById('field-pickup_flight').classList.add('error');
     errors.push('Flight Number (Pickup)'); valid = false;
+  } else if (LOCATIONS[selected.pickup].isOther && !document.getElementById('pickup_other_addr').value.trim()) {
+    document.getElementById('field-pickup_other_addr').classList.add('error');
+    errors.push('Address (Pickup)'); valid = false;
   }
 
   if (!selected.dropoff) {
@@ -349,6 +402,9 @@ function validate() {
   } else if (LOCATIONS[selected.dropoff].isAirport && !document.getElementById('dropoff_flight').value.trim()) {
     document.getElementById('field-dropoff_flight').classList.add('error');
     errors.push('Flight Number (Drop-off)'); valid = false;
+  } else if (LOCATIONS[selected.dropoff].isOther && !document.getElementById('dropoff_other_addr').value.trim()) {
+    document.getElementById('field-dropoff_other_addr').classList.add('error');
+    errors.push('Address (Drop-off)'); valid = false;
   }
 
   if ((parseInt(document.getElementById('total_pax').value)||0) < 1) {
@@ -415,7 +471,7 @@ ${document.getElementById('suitcases').value}
 ${n}Number of small luggage:
 ${document.getElementById('small_bag').value}
 ${n}Fare (one way, per vehicle):
-${getFare(selected.pickup, selected.dropoff) ? '¥' + getFare(selected.pickup, selected.dropoff).toLocaleString('en-US') : ''}
+${getFare(selected.pickup, selected.dropoff) ? fareText(getFare(selected.pickup, selected.dropoff)) : ''}
 ${n}How to pay (cash or credit card ):
 ${document.getElementById('payment').value}
 ${n}Inquiry:
